@@ -1,0 +1,379 @@
+import matplotlib.pyplot as plt
+import numpy as np
+import turtle
+
+
+g = 9.80665    # gravitational acceleration on Earth, in m/s^2
+G = 6.6743 * 10**-11     # gravitational constant, in m^3/(kg*s^2)
+mass_Sun = 1998400 * 10**24   # in kg
+Sun_radius = 695700   # in km
+default_mass_human = 70    # in kg
+datapage_urls = [
+"https://nssdc.gsfc.nasa.gov/planetary/factsheet/earthfact.html",
+"https://nssdc.gsfc.nasa.gov/planetary/factsheet/moonfact.html"
+]
+
+# Defining the celestial bodies data, first their mass (in kg) and then their average radius (in km):
+moons = {
+    # "Moon": [mass_Moon, Moon_mean_radius],
+    "Deimos": [1.51 * 10**15, 6.27],
+    "Europa": [4.8 * 10**22, 1560.8],
+    "Io": [8.9319 * 10**22, 1821.3],
+    "Ganymede": [1.4819 * 10**23, 2631.2],
+    "Callisto": [1.08 * 10**23, 2400],
+    "Titan": [1.3452 * 10**23, 2574.73],
+    "Phobos": [1.06 * 10**16, 11.08],
+    "Enceladus": [1.080318 * 10**20, 250],
+    "Miranda": [6.6 * 10**19, 235.8],
+    "Rhea": [2.31 * 10**21, 764.3]
+}
+terrestrial_dwarf_planets = {
+    # "Earth": [mass_Earth, Earth_mean_radius],
+    "Mercury": [0.3301 * 10**24, 2439.7],
+    "Venus": [4.8673 * 10**24, 6051.8],
+    "Mars": [0.64169 * 10**24, 3389.5],
+    "Pluto": [0.01303 * 10**24, 1188.3],
+    "Haumea": [4.01 * 10**21, 816.0]
+}
+jovian_planets = {
+    "Jupiter": [1898.13 * 10**24, 69911.0],
+    "Saturn": [568.32 * 10**24, 58232.0],
+    "Neptune": [102.409 * 10**24, 24622.0],
+    "Uranus": [86.811 * 10**24, 25362.0]
+}
+stars = {
+    "Sun": [mass_Sun, Sun_radius],
+    "Sirius A": [2.063 * mass_Sun, 1.711 * Sun_radius],
+    "Sirius B": [1.018 * mass_Sun, 0.0084 * Sun_radius],
+    "Polaris": [5.4 * mass_Sun, 37.5 * Sun_radius],
+    "Alpha Centauri A": [1.0788 * mass_Sun, 1.2175 * Sun_radius],
+    "Alpha Centauri B": [0.9092 * mass_Sun, 0.8591 * Sun_radius],
+    "Proxima Centauri": [0.1221 * mass_Sun, 0.1542 * Sun_radius]
+}
+
+
+# This function defines the parameters of the bodies selected for the 3-body problem simulation. It is called when the user selects option 3.
+def get_body_parameters (choice_of_body, choice_of_body_class):
+
+    if choice_of_body_class == "m":
+        class_bodies = moons
+    elif choice_of_body_class == "t":
+        class_bodies = terrestrial_dwarf_planets
+    elif choice_of_body_class == "j":
+        class_bodies = jovian_planets
+    elif choice_of_body_class == "s":
+        class_bodies = stars
+    else:
+        class_bodies = {}   # shouldn't happen
+
+    if class_bodies:
+        body_data = class_bodies.get(choice_of_body)
+
+        # Assigning the values of the parameters (mass and radius) of each body:
+        if not body_data:
+            raise ValueError(f"The body '{choice_of_body}' could not be found in '{choice_of_body_class}' class")
+        
+        mass = body_data[0]
+        radius = body_data[1]
+        dt = 5e5 # 5e5 works for non stars-only simulations
+        x_position, y_position, z_position = 0.0, 0.0, 0.0
+        x_veloc, y_veloc, z_veloc = 0.0, 0.0, 0.0
+
+        # Setting initial positions and velocities:
+
+        # for orbital resonance, should have the T of one body being an integer multiple of another
+
+        if choice_of_body_class == "j":   # relative to the Sun
+            if choice_of_body == "Jupiter":
+                x_position = 778547200000.0   # meters
+                y_position = 0.0
+                z_position = 0.0
+                x_veloc = 0.0
+                y_veloc = 13070.0   # orb veloc of Jup around the Sun (m/s)
+                z_veloc = 0.0
+            
+            elif choice_of_body == "Saturn":
+                x_position = 0.0
+                y_position = 1433449370000.0
+                z_position = 0.0
+                x_veloc = 9690.0   # orb veloc of Sat around the Sun
+                y_veloc = 0.0
+                z_veloc = 0.0
+
+        elif choice_of_body_class == "m":   # relative to the Sun
+            if choice_of_body == "Io":
+                x_position = 778547200000.0 - 421700000.0   # Jupiter distance to Sun - Io dist to Jup
+                y_position = 0.0
+                z_position = 0.0
+                x_veloc = 0.0
+                y_veloc = 13070.0 + 17330.0   # Jupiter veloc + Io orbital veloc around Jupiter (tangential)
+                z_veloc = 0.0
+
+            elif choice_of_body == "Ganymede":
+                x_position = -671   # random
+                y_position = 780
+                z_position = -912
+                x_veloc = 0.000001
+                y_veloc = 0.000001
+                z_veloc = 0.000001
+
+            elif choice_of_body == "Callisto":
+                x_position = 759
+                y_position = -776
+                z_position = 546
+                x_veloc = -0.000001
+                y_veloc = -0.000001
+                z_veloc = -0.000001
+
+        elif choice_of_body_class == "s":   # body acting as a reference frame
+            if choice_of_body == "Sun":
+                x_position = 0.0
+                y_position = 0.0
+                z_position = 0.0
+                x_veloc = 90.0
+                y_veloc = -70.0
+                z_veloc = -400.0
+
+        elif choice_of_body_class == "t":   # relative to the Sun
+            if choice_of_body == "Mars":   # veloc and pos are split by directional components
+                x_position = 227000000000.0
+                y_position = 15000000000.0
+                z_position = 0.0
+                x_veloc = 20849.8
+                y_veloc = 12038.5
+                z_veloc = 0.0
+
+            elif choice_of_body == "Pluto":
+                x_position = -5900000000000.0
+                y_position = 300000000000.0
+                z_position = 0.0
+                x_veloc = 1620.3
+                y_veloc = 4453.2
+                z_veloc = 0.0
+
+            if choice_of_body == "Venus":
+                x_position = 108200000000.0   # radius around Sun
+                y_position = 0.0
+                z_position = 0.0
+                x_veloc = 0.0
+                y_veloc = 35020.0   # veloc around Sun
+                z_veloc = 0.0
+
+        body_data_extended = [mass, radius, x_position, y_position, z_position, x_veloc, y_veloc, z_veloc, dt]
+
+    else:
+        raise ValueError('No class of bodies provided!')
+
+    return choice_of_body, body_data_extended, dt
+
+
+# This function aims at calculating the gravitational forces in action between the 3 bodies.
+def calculate_forces(bodies, body_names):
+
+    num_bodies = len(bodies)
+    forces = np.zeros((num_bodies, 3))   # 'forces' is an array of 3 rows (=num_bodies) and 3 columns initially filled with zeros
+
+    # Looping over each body:
+    for i in range (num_bodies):
+        # Initialising variables to store the total x and y components of the gravitational forces acting on the current body:
+        f_x_total, f_y_total, f_z_total = 0.0, 0.0, 0.0
+
+        # Looping over each body again to calculate the forces between the current body and all other bodies:
+        for j in range (num_bodies):
+
+            if i != j:   # to avoid calculating the current gravitational force between a body and itself
+
+                # print("\n"f"Calculating force between {body_names[i]} and {body_names[j]}")
+
+                # Calculating the differences in x and y coordinates between the 2 bodies:
+                d_x = bodies[j][2] - bodies[i][2]
+                d_y = bodies[j][3] - bodies[i][3]
+                d_z = bodies[j][4] - bodies[i][4]
+                distance = np.sqrt (d_x**2 + d_y**2 + d_z**2)   # Euclidean distance between the 2 bodies considered
+                if distance < 1e-50:
+                    continue
+                # Calculating the gravitational force between the 2 bodies:
+                force = (G * bodies[i][0] * bodies[j][0]) / distance**2
+                # Calculating the angle between the line connecting the 2 bodies and the x-axis:
+                theta = np.arctan2(d_y, d_x)
+                # Finding the elevat° angle:
+                phi = np.arctan2(d_z, np.sqrt(d_x**2 + d_y**2))
+                # Splitting the gravitational force into its x,y and z components:
+                f_x = force * np.cos(theta) * np.cos(phi)
+                f_y = force * np.sin(theta) * np.cos(phi)
+                f_z = force * np.sin(phi)
+
+                # Accumulating the x and y components acting on the current body:
+                f_x_total += f_x
+                f_y_total += f_y
+                f_z_total += f_z
+
+        # Appending the total x and y components of gravitational forces acting on the current body ([i]) to the list 'forces':
+        forces[i] = [f_x_total, f_y_total, f_z_total]
+        # print(f"Force update for {body_names[i]} at index {i}: {forces[i]}")
+    
+    with open('forces.txt', 'a') as file:
+        for force in forces:
+            file.write(f"{force[0]}, {force[1]}, {force[2]},\n")
+
+    return forces
+
+
+# This function aims at updating the positions and velocities of the objects based on the forces acting on them as well as the time passing.
+def update_bodies(bodies, forces, body_names):
+
+    updated_bodies = []
+
+    for i in range(len(bodies)):
+        body = bodies[i]   # 'bodies' is a list containing the body_data (7 items) of each body, so 21 items split into 3 parts. 'body' represents one of those parts (the [i] one)
+
+        dt = body[8]
+
+        # Use Leapfrog method to update velocities first
+        body[5] += 0.5 * forces[i][0] * dt / body[0]  # Velocity update for x
+        body[6] += 0.5 * forces[i][1] * dt / body[0]  # Velocity update for y
+        body[7] += 0.5 * forces[i][2] * dt / body[0]  # Velocity update for z
+        
+        # Now update positions using updated velocities
+        body[2] += body[5] * dt  # x-position update
+        body[3] += body[6] * dt  # y-position update
+        body[4] += body[7] * dt  # z-position update
+        
+        # Update velocities for the second half step (Leapfrog step)
+        body[5] += 0.5 * forces[i][0] * dt / body[0]  # Velocity update for x
+        body[6] += 0.5 * forces[i][1] * dt / body[0]  # Velocity update for y
+        body[7] += 0.5 * forces[i][2] * dt / body[0]  # Velocity update for z
+
+        updated_bodies.append(body)
+
+        body_Matlab = {"x_pos": body[2],
+                       "y_pos": body[3],
+                       "z_pos": body[4],
+                       "x_veloc": body[5],
+                       "y_veloc": body[6],
+                       "z_veloc": body[7]
+        }
+
+        # print(f"Updated {body_names[i]}: {body}")
+
+        # print(f"Updated {body_names[i]} for Matlab: {body_Matlab}")
+        with open('updated_bodies.txt', 'a') as file:
+            file.write(f"{body_names[i]}, x_pos={body_Matlab['x_pos']}, y_pos={body_Matlab['y_pos']}, z_pos={body_Matlab['z_pos']}, x_veloc={body_Matlab['x_veloc']}, y_veloc={body_Matlab['y_veloc']}, z_veloc={body_Matlab['z_veloc']}\n")
+
+    return updated_bodies
+
+
+def three_body_problem():
+    colors = ["green", "red", "blue"]
+    choices = []
+    bodies = []
+    body_names = []
+
+    # Allow the user to pick bodies from different categories
+    for i in range(3):
+        while True:
+            choice_of_body_class = input(
+                f"For celestial body {i+1}, which group of celestial bodies would you like to investigate? "
+                "Please choose among 'moons' (type 'm'), 'terrestrial/dwarf planets' (type 't'), 'jovians' (type 'j'), and 'stars' (type 's'): "
+            )
+
+            if choice_of_body_class == 'm':
+                options = moons
+                break
+            elif choice_of_body_class == 't':
+                options = terrestrial_dwarf_planets
+                break
+            elif choice_of_body_class == 'j':
+                options = jovian_planets
+                break
+            elif choice_of_body_class == 's':
+                options = stars
+                break
+            else:
+                print("Try entering a valid response :( ")
+                continue
+
+        choice = input(f"Please pick celestial body {i+1} from the list: {list(options.keys())}: ")
+        while choice not in options:
+            choice = input(f"Invalid choice. Please choose celestial body {i+1} from the list: {list(options.keys())}: ")
+        choices.append((choice, choice_of_body_class))
+
+    for choice, category in choices:
+        body_name, body_data, dt = get_body_parameters(choice, category)
+        
+        bodies.append(body_data)
+        body_names.append(body_name)
+
+        # Printing initial parameters:
+        print(f"Initial parameters for {body_name}:")
+        print(f"Position: ({body_data[2]}, {body_data[3]}, {body_data[4]})")  # Position X, Y, Z
+        print(f"Velocity: ({body_data[5]}, {body_data[6]}, {body_data[7]})")  # Velocity X, Y, Z
+
+    # Initialising the 3D figure and each axis:
+    fig = plt.figure(figsize=(18, 8))
+    ax = fig.add_subplot(111, projection='3d')  # 3D projection
+    ax.set_xlabel("X")
+    ax.set_ylabel("Y")
+    ax.set_zlabel("Z")
+
+    # Setting the axis limits:
+    ax.set_title("Three-Body Problem 3D Simulation")
+    ax.set_xlim(-1.7e12, 1.7e12)   # 1.7e12 works for moons, terrestrials and jovials
+    ax.set_ylim(-1.7e12, 1.7e12)
+    ax.set_zlim(-1.7e12, 1.7e12)
+
+    # Initialising scatter plot objects for each body:
+    scatters = []
+
+    # Gathering radii data:
+    body_sizes = [body[1] for body in bodies]
+    # Looping over the colour list to assign a colour to each body:
+    body_colors = [colors[i % len(colors)] for i in range(len(bodies))]
+
+    for i in range(len(bodies)):
+        scatter = ax.scatter(
+            bodies[i][2], bodies[i][3], bodies[i][4],
+            c=body_colors[i], s=(body_sizes[i]/650)**0.5, label=body_names[i]
+        )
+        scatters.append(scatter)
+
+   # Customising the legend to show bodies with their respective colors:
+    handles = list()
+    for i in range(len(bodies)):
+        # Create a handle with the body color
+        handle = plt.Line2D([0], [0], marker='o', color='w', markerfacecolor=body_colors[i], markersize=10, label=body_names[i])
+        handles.append(handle)
+
+    ax.legend(handles=handles)
+
+    for _ in range(10000):  # simulation loop for 1000 time steps
+        forces = calculate_forces(bodies, body_names)
+        bodies = update_bodies(bodies, forces, body_names)
+
+        # Updating the scatter plot with the new positions:
+        for i in range(len(bodies)):
+            scatters[i]._offsets3d = (
+                [bodies[i][2]],   # X pos
+                [bodies[i][3]],   # Y pos
+                [bodies[i][4]]   # Z pos
+            )
+
+        plt.draw()
+        plt.pause(0.01)
+
+        # Stopping the output data flow once the plot window has been closed:
+        if not plt.fignum_exists(fig.number):
+            break
+
+    plt.show()
+
+
+def main():
+    three_body_problem ()
+    print ("This system is a three-body problem, as 3 masses are interacting with one another through gravitational forces.")
+    turtle.done()
+
+
+# Calling the main function:
+if __name__ == "__main__":
+    main()
