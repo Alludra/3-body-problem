@@ -13,6 +13,7 @@ datapage_urls = [
 "https://nssdc.gsfc.nasa.gov/planetary/factsheet/moonfact.html"
 ]
 
+# ONLY SOME CAN BE PICKED
 # Defining the celestial bodies data, first their mass (in kg) and then their average radius (in km):
 moons = {
     # "Moon": [mass_Moon, Moon_mean_radius],
@@ -52,7 +53,7 @@ stars = {
 }
 
 
-# This function defines the parameters of the bodies selected for the 3-body problem simulation. It is called when the user selects option 3.
+# This function defines the parameters of the bodies selected for the 3-body problem simulation.
 def get_body_parameters (choice_of_body, choice_of_body_class):
 
     if choice_of_body_class == "m":
