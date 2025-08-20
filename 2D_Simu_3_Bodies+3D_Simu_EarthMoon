@@ -1,0 +1,798 @@
+# Importing all libraries used in the code:
+
+import urllib.request
+import os
+import ssl
+import re
+import matplotlib.pyplot as plt
+import numpy as np
+from urllib.error import URLError
+from urllib.error import HTTPError
+from matplotlib.animation import FuncAnimation
+import random
+import turtle
+import tkinter
+
+
+# Declaring constants and variables with unchanging values used somewhere in the code:
+
+g = 9.80665    # gravitational acceleration on Earth, in m/s^2
+G = 6.6743 * 10**-11     # gravitational constant, in m^3/(kg*s^2)
+default_mass_human = 70    # in kg
+datapage_urls = [
+"https://nssdc.gsfc.nasa.gov/planetary/factsheet/earthfact.html",
+"https://nssdc.gsfc.nasa.gov/planetary/factsheet/moonfact.html"
+]
+# To disable the Certificate Verification and the error that stems from it:
+context = ssl._create_unverified_context()
+
+
+# Creating an absolute file path for a file that is generated as part of the program:
+output_file_path = os.path.join(os.getcwd(), 'NASA_factsheets_cel_bodies.txt')
+
+
+# This function copies content of NASA web pages containing data on the Earth and the Moon, in a textfile called "NASA_factsheets_cel_bodies.txt".
+def webpage_textfile():
+
+    if os.path.exists (output_file_path):
+        os.remove (output_file_path)   # deleting the file if it already exists, to avoid appending multiple times.
+
+    try:
+        with open(output_file_path, 'a+') as outFile:
+            for url in datapage_urls:
+                try:
+                    page = urllib.request.urlopen(url, context=context).read().decode()
+                    outFile.write(page)
+
+                except (URLError, HTTPError, UnicodeDecodeError) as e1:
+                    print ('There was an error generating the textfile due to:', e1)
+
+    except Exception as e2:
+        print ('There was an error opening the web page, due to:', e2)
+
+webpage_textfile()
+
+
+# Each of the following 3 functions correspond to one of the bodies analysed (a human, Earth, the Moon).
+
+# This function prompts the user for input on their mass for a more currated output.
+def human():
+
+    mass_human = input("What is your mass (or 'weight' in common language)? ")
+
+    if not mass_human:
+        mass_human = default_mass_human
+    else:
+        try:
+            mass_human = float(mass_human)
+        except (ValueError, TypeError):
+            print ('A default value for your mass was used for this simulation.')
+            mass_human = default_mass_human
+
+    return mass_human
+
+
+# This function retrieves data for the Earth from the textfile generated above.
+def Earth():
+
+    # Initiating an empty dictionary to store Earth's data:
+    Earth_data = {}
+
+    try:
+        with open ('NASA_factsheets_cel_bodies.txt', 'r') as textfile:
+            content = textfile.read()
+
+            # Extracting the 'Mass' information from the textfile:
+            pattern_mass_Earth = r'Mass \(10<sup>24</sup> kg\)\s*([0-9]+(?:\.[0-9]+)?)'   # 'r' is used to make the literal a raw string literal so backlashes are handled as normal characters instead of escape sequences such as \n.'\' so the dot is handled literally, as a dot (to capture the # in decimal places).
+            match_mass_Earth = re.findall (pattern_mass_Earth, content)   # this returns a list with the mass of the Earth according to the NASA website as only element.
+            if match_mass_Earth:
+                mass_Earth = float (match_mass_Earth[0]) * 10**24   # in kg
+                # Storing the value mass_Earth in the dictionary Earth_data along with the key 'mass_Earth':
+                Earth_data['mass_Earth'] = mass_Earth
+            else:
+                print ('No matches found for the mass of Earth in the textfile.')
+
+            pattern_acceleration_Earth = r'Surface gravity \(mean\) \(m/s<sup>2</sup>\)\s*([0-9]+(?:\.[0-9]+)?)'
+            match_acceleration_Earth = re.findall (pattern_acceleration_Earth, content)
+            if match_acceleration_Earth:
+                Earth_acceleration = float (match_acceleration_Earth[0])   # in m/s, this is the mean surface acceleration.
+                Earth_data['Earth_acceleration'] = Earth_acceleration
+            else:
+                print ('No matches found for the mean surface acceleration of Earth in the textfile.')
+
+            pattern_Earth_radius = r'Volumetric mean radius \(km\)\s*([0-9]+(?:\.[0-9]+)?)'
+            match_Earth_radius = re.findall (pattern_Earth_radius, content)
+            if match_Earth_radius:
+                Earth_mean_radius = float (match_Earth_radius[0])   # in km, this is the mean radius of Earth
+                Earth_data['Earth_mean_radius'] = Earth_mean_radius
+            else:
+                print ("No matches found for the mean radius of Earth in the textfile.")
+
+            # Compute the value for mu (the standard gravitational parameter) using mass_Earth from the dictionary if found, if not proceeds to the calculation in the second part of the ()
+            mu = G * Earth_data.get('mass_Earth', G*mass_Earth)   # in m^3/(kg*s^2)
+            Earth_data['mu'] = mu
+
+    # Handling errors related to finding/processing/saving matches:
+    except Exception as e:
+        print ("An error occurred processing the Earth data. Please run the program again. Error: ", e)
+    
+    if user_input == '2':
+        print ('Earth data:', Earth_data)
+    return Earth_data   # returns the dictionary
+
+
+# This function retrieves data for the Moon from the textfile generated above.
+def Moon():
+
+    # Initiating an empty dictionary to store Moon's data:
+    Moon_data = {}
+
+    try:
+        with open ('NASA_factsheets_cel_bodies.txt', 'r') as textfile:
+            content = textfile.read()
+
+            pattern_mass_Moon = r'<th align="left">Mass \(10<sup>24</sup> kg\)</th>\s*<td align="center">([0-9]+\.[0-9]+)</td>'
+            match_mass_Moon = re.findall (pattern_mass_Moon, content)
+            if match_mass_Moon:
+                mass_Moon = float (match_mass_Moon[0]) * 10**24   # in kg
+                Moon_data['mass_Moon'] = mass_Moon   # associating the key 'mass_Moon' with the value of mass_Moon
+            else:
+                print ('No matches found for the mass of the Moon in the textfile.')
+
+            pattern_Moon_semimajor_axis = r'Semimajor axis \(10<sup>6</sup> km\)</th>\s*<td align="center">([0-9.]+)</td>'
+            match_Moon_semimajor_axis = re.findall (pattern_Moon_semimajor_axis, content)
+            if match_Moon_semimajor_axis:
+                Moon_semimajor_axis = float (match_Moon_semimajor_axis[0]) * 10**6   # in km, this is the mean distance from the Moon to Earth.
+                Moon_data['Moon_semimajor_axis'] = Moon_semimajor_axis
+            else:
+                print ('No matches found for the mean distance Earth-Moon in the textfile.')
+
+            pattern_Moon_eccentr = r'Orbit eccentricity</th>\s*<td align="center">([0-9.]+)</td>'
+            match_Moon_eccentr = re.findall (pattern_Moon_eccentr, content)   # dimensionless, this is the eccentricity of the lunar orbit
+            if match_Moon_eccentr:
+                Moon_eccentr = float (match_Moon_eccentr[0])
+                Moon_data['Moon_eccentr'] = Moon_eccentr
+            else:
+                print ('No matches found for the eccentricity of the lunar orbit around Earth in the textfile.')
+
+            pattern_Moon_perigee = r'Perigee \(10<sup>6</sup> km\).*?</th>\s*<td[^>]*>\s*([0-9.]+)'
+
+            match_Moon_perigee = re.findall (pattern_Moon_perigee, content)
+            if match_Moon_perigee:
+                Moon_perigee = float (match_Moon_perigee[0]) * 10**6   # in km, this is the smallest distance from the Moon to Earth
+                Moon_data['Moon_perigee'] = Moon_perigee
+            else:
+                print ('No matches found for the radius of the Moon at perigee in the textfile.')
+
+            pattern_Moon_orb_inclin = r'Inclination to ecliptic \(deg\)</th>\s*<td align="center">([0-9.]+)</td>'
+            match_Moon_orb_inclin = re.findall (pattern_Moon_orb_inclin, content)
+            if match_Moon_orb_inclin:
+                Moon_orb_inclin = float (match_Moon_orb_inclin[0]) * (np.pi / 180)   # in radians, this is the angle between the orbital plane of the Moon and the ecliptic
+                Moon_data['Moon_orb_inclin'] = Moon_orb_inclin
+            else:
+                print ("No matches found for the inclination of the Moon's orbit around Earth in the textfile.")
+
+            pattern_Moon_radius = r'Volumetric mean radius \(km\)<\/th>\s*<td align=\"center\">(\d+\.\d+)<\/td>'
+            match_Moon_radius = re.findall (pattern_Moon_radius, content)
+            if match_Moon_radius:
+                Moon_mean_radius = float (match_Moon_radius[0])   # in km, this is the mean radius of the Moon
+                Moon_data['Moon_mean_radius'] = Moon_mean_radius
+            else:
+                print ("No matches found for the radius of the Moon in the textfile.")
+
+    # Handling errors related to finding/processing/saving matches:
+    except:
+        print ("An error occurred, and the textfile couldn't be opened or read. Please try running the program again.")
+
+    if user_input == '2':
+        print ('Moon data:', Moon_data)
+    return Moon_data
+
+
+# This function calculates and outputs the gravitational forces and accelerations between Earth and a human. It is executed if the user chooses option 1.
+def gravitational_Force_Earth_human (Earth, human):
+
+    # Calling the human() function to access its return value:
+    mass_human = human()
+
+    # Calling the Earth() function to access its return value:
+    Earth_data = Earth()
+    # Extracting necessary data from the dictionary:
+    mass_Earth = Earth_data.get('mass_Earth')
+    Earth_radius = Earth_data.get('Earth_mean_radius')
+    
+    try:
+        F_grav = (G * mass_Earth * mass_human) / ((Earth_radius * 1000) ** 2)   # multiplied by 1000 to obtain the radius in meters
+        g_Earth = F_grav / mass_Earth
+        g_human = F_grav / mass_human
+
+        print (f"The modulus of the force exerted by Earth on you is {F_grav:.5}N, which is the same as the force you exert on the Earth ({F_grav:.5}N)!")    # .4 rounds to 5 significant figures
+        print (f"However, the attraction due to Earth's gravitational force that you experience, {g_human:.5}m/s^2, is not equal to that of the Earth due to your gravitational force: {g_Earth:.5}m/s^2.")
+        return F_grav, g_Earth, g_human
+    
+    # Handling potential errors occurring during the calculations:
+    except (TypeError, ZeroDivisionError) as e:
+        print ('An error occurred during the calculations for this simulation. Please try again.', e)
+
+
+# This function computes the required parameters to simulate a lunar orbit around Earth. It is executed if the user selects option 2.
+# NOTE: Earth is used as the reference frame and forces exerted by the Sun and other bodies are discarded. Additionally, the plot produced is in 3D.
+def Earth_Moon_syst (Earth, Moon):
+
+    try:
+        # Accessing values from the dictionaries Earth_data and Moon_data:
+        Earth_data = Earth()
+        Moon_data = Moon()
+        Moon_perigee = Moon_data.get('Moon_perigee')
+        Moon_semimajor_axis = Moon_data.get('Moon_semimajor_axis')
+        mu = Earth_data.get('mu')
+        Moon_orb_inclin = Moon_data.get('Moon_orb_inclin')
+        Moon_eccentr = Moon_data.get('Moon_eccentr')
+        Earth_mean_radius = Earth_data.get('Earth_mean_radius')
+        Moon_mean_radius = Moon_data.get('Moon_mean_radius')
+
+        num_steps = 1000   # number of time steps
+        dt = 1   # duration of each time step (in seconds) in animation
+
+        # Creating a figure and axes for plotting:
+        fig = plt.figure()
+        ax = fig.add_subplot(111, projection='3d')
+        ax.set_xlabel('X (km)')
+        ax.set_ylabel('Y (km)')
+        ax.set_zlabel('Z (km)')
+        ax.set_title('Moon Orbiting Earth')
+        ax.legend()
+
+        # Defining an appropriate scale factor to have objects to the right scale but still visible:
+        scale_factor = 1e-3
+
+        # Updating plotting of Earth and Moon positions and scaling the objects to represent real radii relative to one another:
+        Earth_plot = ax.scatter([0], [0], [0], color='blue', label='Earth', s=scale_factor*Earth_mean_radius)
+        Moon_plot = ax.scatter([], [], [], color='red', label='Moon', s=scale_factor*Moon_mean_radius)
+
+        # Computing the value of the angular momentum vector, h, at perigee (constant throughout orbit):
+        h = np.array([0, np.sqrt (mu * Moon_perigee), 0])
+
+        # Computing the value of the magnitude of the angular momentum vector (in km^2/s):
+        h_magn = np.sqrt( (h[0])**2 + (h[1])**2 + (h[-1])**2 )
+
+        # Computing the value of the Node line vector, N (constant):
+        k = [0, 0, 1]
+        N = np.cross (k, h)   # np.cross is used to mutliply matrices together with the cross product & np.dot is used instead for dot products
+
+        # Computing the magnitude of the Node line vector:
+        N_magn = np.sqrt( (N[0])**2 + (N[1])**2 + (N[-1])**2 )
+
+        # Creating lists comprising the position and velocity vectors of the Moon:
+        Moon_position_vect = [0, 0, Moon_perigee]   # x, y and z coordinates of the initial position of the Moon (set to perigee)
+
+        v_perigee = np.sqrt (mu * (2 / Moon_perigee - 1 / Moon_semimajor_axis) )   # this is a magnitude. The velocity vector has only 1 non-zero component, in the x direction since h ⏊ v ⏊ r
+        Moon_veloc_vect = [v_perigee, 0, 0]   # x, y and z coordinates of the initial velocity of the Moon (the one at perigee)
+
+        # Computing the magnitude of the velocity vector of the Moon (km/s):
+        v = np.sqrt( (Moon_veloc_vect[0])**2 + (Moon_veloc_vect[1])**2 + (Moon_veloc_vect[-1])**2 )
+
+        # Computing the magnitude of the position vector of the Moon (km):
+        r_magn = np.sqrt( (Moon_position_vect[0])**2 + (Moon_position_vect[1])**2 + (Moon_position_vect[-1])**2 )
+
+        # Computing the value of the radial velocity, v_r (km/s):
+        v_r = np.dot (Moon_veloc_vect, Moon_position_vect) / r_magn  
+
+        # Computing the eccentricity vector, e:
+        e = 1/mu * ( (v**2 - mu/r_magn) * np.array(Moon_position_vect) - r_magn * v_r * np.array(Moon_veloc_vect) )
+
+        # Computing the magnitude of the eccentricity vector:
+        e_magn = np.sqrt( (e[0])**2 + (e[1])**2 + (e[-1])**2 )
+
+        # Computing the (fixed) value of the longitude of the right ascending node, omega:
+        dot_prod_e_N = np.dot(e, N)   # calculating the scalar result of the dot product between e and N:
+        omega = np.arccos (dot_prod_e_N / (e_magn * N_magn))
+        # this is the angle between the node line (the line in the X-Y plane where the orbital plane intersects the ecliptic) and the x axis, pointing at the vernal equinox:
+
+
+        # This function aims at determining the position of the Moon along its orbit around Earth at each time step. It is executed whenever Earth_Moon_syst is called.
+        def update_Moon_position (step):
+
+            try:
+                # Incrementing the time by dt at each iteration:
+                time_elapsed = step*dt
+
+                # Computing the value of the period of the Moon's orbit, T (constant):
+                T = (2 * np.pi / np.sqrt(mu)) * (Moon_semimajor_axis)**(3/2)
+
+                # Computing the initial value of M_e and incrementing it based on the elapsed time:
+                M_e =  (2*np.pi * time_elapsed) / T
+
+                # Using Newton's method to compute the value of the eccentric anomaly, E:
+                tolerance = 1e-3   # convergence tolerance
+                max_iterations = 100
+
+                E = M_e + Moon_eccentr * np.sin(M_e)   # initial guess
+                for _ in range(max_iterations):
+                    delta_E = (E - Moon_eccentr * np.sin(E) - M_e) / (1 - Moon_eccentr * np.cos(E))
+                    E = E - delta_E
+                    if abs(delta_E) < tolerance:
+                        break
+
+                # Computing the value of the true anomaly, representing the angle between the perigee and the Moon's position, theta:
+                theta = 2 * np.arctan( (np.sqrt( (1+Moon_eccentr) / (1-Moon_eccentr)) ) * np.tan (E / 2) )
+
+                # Computing the value of the radius Moon - Earth, r:
+                r = (h_magn**2 / mu) * ( 1 / (1 + Moon_eccentr*np.cos(theta)) )
+
+                # Updating the Moon's position over time:
+                X = r * np.cos(theta)    # distance from the origin of X axis in the XY plane
+                Y = r * np.sin(theta)    # distance from the origin of Y axis in the XY plane
+                Z = r * np.sin(Moon_orb_inclin) * np.sin(omega + theta)   # vertical distance from the orbital plane of the Moon to the orbital plane of the Earth aka the ecliptic
+
+                return X, Y, Z   # returns the updated positions
+            
+            # Handling potential errors arising while performing arithmetic calculations:
+            except(ValueError, Exception) as e1:
+                print ('An error occured during the numerical calculations process: ', e1)
+
+
+        # The following function creates an animated plot that shows the Moon orbiting the Earth. It is executed whenever Earth_Moon_syst is called.
+        def animated_plot (position_point):
+
+            try:
+                # Plotting Earth as a blue point at the origin:
+                ax.scatter(0, 0, 0, color='blue', label='Earth')
+
+                # Plotting the Moon at the updated position for the current frame or short-lived image:
+                X, Y, Z = update_Moon_position(position_point)
+                # Creating a tuple of 3 NumPy arrays, each representing the updated position of the Moon in the x, y or z direction:
+                Moon_plot._offsets3d = (np.array([X]), np.array([Y]), np.array([Z]))
+
+                # Setting plot limits / axes ranges:
+                ax.set_xlim ([-550000, 550000])
+                ax.set_ylim ([-550000, 550000])
+                ax.set_zlim ([-550000, 550000])
+
+            # Handling potential errors arising while generating the plot:
+            except (ValueError, Exception) as e2:
+                print('An error occurred while generating the animated plot: ', e2)
+
+        # Creating the animation:
+        animation = FuncAnimation(fig, animated_plot, frames=num_steps, interval=100)
+
+        # Displaying the animation:
+        plt.show()
+
+    # Handling potential errors occurring during the calculations within Earth_Moon_syst:
+    except (ValueError, Exception) as e3:
+        print ('An error occurred while performing the calculations within the Earth_Moon_syst function: ', e3)
+
+
+# This function defines the parameters of the bodies selected for the 3-body problem simulation. It is called when the user selects option 3.
+def get_body_parameters (choice_of_body):
+
+    # Assigning the values of the parameters (mass and radius) of each body:
+
+    # Extracting the Earth's and the Moon's the data from their assigned dictionaries:
+    Earth_data = Earth()
+    mass_Earth = Earth_data.get('mass_Earth')
+    Earth_mean_radius = Earth_data.get('Earth_mean_radius')
+    Moon_data = Moon()
+    mass_Moon = Moon_data.get('mass_Moon')
+    Moon_mean_radius = Moon_data.get('Moon_mean_radius')
+    
+    # Setting mass and radius values of common celestial objects:
+    mass_Mercury = 0.3301 * 10**24   # kg
+    Mercury_radius = 2439.7   # km
+    mass_Sun = 1998400 * 10**24
+    Sun_radius = 695700
+    mass_Jupiter = 1898.13 * 10**24
+    Jupiter_radius = 69911
+    mass_Venus = 4.8673 * 10**24
+    Venus_radius = 6051.8
+    mass_Pluto = 0.01303 * 10**24
+    Pluto_radius = 1188
+    mass_Deimos = 1.51 * 10**15
+    Deimos_radius = 6.27
+    mass_SiriusA = 2.063 * mass_Sun
+    SiriusA_radius = 1.711 * Sun_radius
+    mass_SiriusB = 1.018 * mass_Sun
+    SiriusB_radius = 0.0084 * Sun_radius
+    mass_Neptune = 102.409 * 10**24
+    Neptune_radius = 24622
+    mass_Mars = 0.64169 * 10**24
+    Mars_radius = 3389.5
+    mass_Phobos = 1.06 * 10**16
+    Phobos_radius = 11.08
+    mass_Uranus = 86.811 * 10**24
+    Uranus_radius = 25362
+    mass_Polaris = 5.4 * mass_Sun
+    Polaris_radius = 37.5 * Sun_radius
+    mass_ProximaCentauri = 0.1221 * mass_Sun
+    ProximaCentauri_radius = 0.1542 * Sun_radius
+    mass_Titan = 1.3452 * 10**23
+    Titan_radius = 2574.73
+    mass_Saturn = 568.32 * 10**24
+    Saturn_radius = 58232
+
+    # Setting boudaries for initial positions and velocities:
+    min_position = -180
+    max_position = 180
+    min_veloc = -0.01
+    max_veloc = 0.01
+    
+    # Randomising the values for the initial positions and velocities:
+    x_position = random.uniform(min_position, max_position)
+    y_position = random.uniform(min_position, max_position)
+    x_veloc = random.uniform(min_veloc, max_veloc)
+    y_veloc = random.uniform(min_veloc, max_veloc)
+
+    # Initialising sets to store all masses and radii:
+    mass_values = (
+    mass_Earth, mass_Moon, mass_Mercury, mass_Sun, mass_Jupiter, mass_Venus,
+    mass_Pluto, mass_Deimos, mass_SiriusA, mass_SiriusB, mass_Neptune, mass_Mars,
+    mass_Phobos, mass_Uranus, mass_Polaris, mass_ProximaCentauri, mass_Titan,
+    mass_Saturn
+    )
+    radius_values = (
+    Earth_mean_radius, Moon_mean_radius, Mercury_radius, Sun_radius, Jupiter_radius,
+    Venus_radius, Pluto_radius, Deimos_radius, SiriusA_radius, SiriusB_radius,
+    Neptune_radius, Mars_radius, Phobos_radius, Uranus_radius, Polaris_radius,
+    ProximaCentauri_radius, Titan_radius, Saturn_radius
+    )
+    # Finding the min and max values of mass and radius from the 'mass_values' and 'radius_values' sets (used as boundaries):
+    # NOTE: values of mass and radius have been adjusted (decreased) in order for objects to fit (and remain) on the screen.  This modification sacrifices a significant amount of realism in the simulation but is necessary to properly visualise the bodies.
+    min_radius = (min(radius_values) / 600000)
+    max_radius = (max(radius_values) / 600000)
+    min_mass = (min(mass_values) / 17000000000)
+    max_mass = (max(mass_values) / 17000000000)
+
+    # Determining the chosen bodies according to the first letter(s) typed in by the user:
+    # NOTE: this method captures some invalid inputs, but that does not have a significant impact on the goal of the simulation.
+    if choice_of_body.startswith ("E"):   # defaults to Earth
+        # Storing each body's data into an ordered list to later retrieve items individually (using indices):
+        body_data = [mass_Earth/10**5, Earth_mean_radius/10**2.8, x_position, y_position, x_veloc, y_veloc]
+
+    elif choice_of_body.startswith ("Mo"):   # defaults to Moon
+        body_data = [mass_Moon/10**5, Moon_mean_radius/10**2.8, x_position, y_position, x_veloc, y_veloc]
+    
+    elif choice_of_body.startswith ("Me"):   # defaults to Mercury
+        body_data = [mass_Mercury/10**5, Mercury_radius/10**2.8, x_position, y_position, x_veloc, y_veloc]
+
+    elif choice_of_body.startswith("Su"):   # defaults to Sun
+        body_data = [mass_Sun/10**7, Sun_radius/10**3.8, x_position, y_position, x_veloc, y_veloc]
+
+    elif choice_of_body.startswith("J"):   # defaults to Jupiter
+        body_data = [mass_Jupiter/10**5, Jupiter_radius/10**2.8, x_position, y_position, x_veloc, y_veloc]
+
+    elif choice_of_body.startswith("V"):  # defaults to Venus
+        body_data = [mass_Venus/10**5, Venus_radius/10**2.8, x_position, y_position, x_veloc, y_veloc]
+
+    elif choice_of_body.startswith("Pl"):   # defaults to Pluto
+        body_data = [mass_Pluto/10**5, Pluto_radius/10**2.8, x_position, y_position, x_veloc, y_veloc]
+
+    elif choice_of_body.startswith("D"):   # defaults to Deimos
+        body_data = [mass_Deimos/10**5, Deimos_radius/10**2.8, x_position, y_position, x_veloc, y_veloc]
+
+    elif choice_of_body.startswith("Si") and 'A' in choice_of_body:   # defaults to Sirius A
+        body_data = [mass_SiriusA/10**7, SiriusA_radius/10**3.8, x_position, y_position, x_veloc, y_veloc]
+
+    elif choice_of_body.startswith("Si") and 'B' in choice_of_body:   # defaults to Sirius B
+        body_data = [mass_SiriusB/10**7, SiriusB_radius/10**2.8, x_position, y_position, x_veloc, y_veloc]
+
+    elif choice_of_body.startswith("N"):   # defaults to Neptune
+        body_data = [mass_Neptune/10**5, Neptune_radius/10**2.8, x_position, y_position, x_veloc, y_veloc]
+
+    elif choice_of_body.startswith("Ma"):   # defaults to Mars
+        body_data = [mass_Mars/10**5, Mars_radius/10**2.8, x_position, y_position, x_veloc, y_veloc]
+
+    elif choice_of_body.startswith("Ph"):   # defaults to Phobos
+        body_data = [mass_Phobos/10**5, Phobos_radius/10**2.8, x_position, y_position, x_veloc, y_veloc]
+
+    elif choice_of_body.startswith("U"):   # defaults to Uranus
+        body_data = [mass_Uranus/10**5, Uranus_radius/10**2.8, x_position, y_position, x_veloc, y_veloc]
+
+    elif choice_of_body.startswith("Po"):   # defaults to Polaris
+        body_data = [mass_Polaris/10**6, Polaris_radius/10**3.8, x_position, y_position, x_veloc, y_veloc]
+
+    elif choice_of_body.startswith("Pr"):   # defaults to Proxima Centauri
+        body_data = [mass_ProximaCentauri/10**6, ProximaCentauri_radius/10**3.8, x_position, y_position, x_veloc, y_veloc]
+
+    elif choice_of_body.startswith("T"):   # defaults to Titan
+        body_data = [mass_Titan/10**5, Titan_radius/10**2.8, x_position, y_position, x_veloc, y_veloc]
+    
+    elif choice_of_body.startswith("Sa"):   # defaults to Saturn
+        body_data = [mass_Saturn/10**5, Saturn_radius/10**2.8, x_position, y_position, x_veloc, y_veloc]
+
+    else:   # Randomising the masses and radii values in case of invalid user input (and not starting by the letters above), using the boundaries initiated previously and assigning to the body_data list:
+        mass_default = random.uniform (min_mass, max_mass)
+        radius_default = random.uniform (min_radius, max_radius)
+        body_data = [mass_default, radius_default, x_position, y_position, x_veloc, y_veloc]
+
+    return body_data
+
+
+# This function updates the position and velocity of each body in the 3-body problem, based on their acceleration and the time passing.
+# NOTE: the following calculations use the semi-implicit Euler method, which is an approximation of the reality.
+def update_body(body, x_accel, y_accel, dt):
+
+    body = list(body)
+    body[4] += x_accel * dt   # updating the velocity in the x direction
+    body[5] += y_accel * dt   # updating the velocity in the y direction
+    body[2] += body[4] * dt   # updating the position in the x direction
+    body[3] += body[5] * dt   # updating the position in the y direction
+
+    return tuple(body)
+
+
+# This function draws a point on the screen to represent each celestial body.
+def draw_point(turtle_obj, x, y, radius, color):
+
+    turtle_obj.penup()
+    turtle_obj.goto(x, y - radius)
+    turtle_obj.pendown()
+    turtle_obj.color(color)
+    turtle_obj.begin_fill()
+    turtle_obj.circle(radius)
+    turtle_obj.end_fill()
+
+
+# This function aims at calculating the gravitational forces in action between the 3 bodies.
+def calculate_forces(bodies):
+
+    # Initialising an empty list to store the calculated forces:
+    forces = []
+
+    # Looping over each body in the 'bodies' list:
+    for i, body1 in enumerate(bodies):
+
+        # Initialising variables to store the total x and y components of the gravitational forces acting on the current body:
+        fx_total, fy_total = 0.0, 0.0
+        fx_total, fy_total = 0.0, 0.0
+
+        # Looping over each body again to calculate the forces between the current body and all other bodies:
+        for j, body2 in enumerate(bodies):
+
+            if i != j:   # to avoid calculating the current gravitational force between a body and itself
+                # Calculating the differences in x and y coordinates between the 2 bodies:
+                dx = body2[2] - body1[2]
+                dy = body2[3] - body1[3]
+                # Calculating the distance between the 2 bodies:
+                distance = np.sqrt (dx**2 + dy**2)
+                # Calculating the gravitational force between the 2 bodies:
+                force = G * body1[0] * body2[0] / distance**2
+                # Calculating the angle between the line connecting the 2 bodies and the x-axis:
+                theta = np.arctan2(dy, dx)
+                # Splitting the gravitational force into its x and y components:
+                fx = force * np.cos(theta)
+                fy = force * np.sin(theta)
+                # Accumulating the x and y components acting on the current body:
+                fx_total += fx
+                fy_total += fy
+
+        # Appending the total x and y components of gravitational forces acting on the current body to the list:
+        forces.append((fx_total / body1[0], fy_total / body1[0]))
+    
+    return forces
+
+
+# This function aims at updating the positions and velocities of the objects based on the forces acting on them as well as the time passing.
+def update_bodies(bodies, forces, dt):
+    updated_bodies = []
+    for i, body in enumerate(bodies):
+        # Extracting the x and y components of the force acting on the body:
+        ax, ay = forces[i]
+        # Calculating the new x and y velocities:
+        vx = body[4] + ax * dt
+        vy = body[5] + ay * dt
+        # Calculating the new x and y positions:
+        x = body[2] + vx * dt
+        y = body[3] + vy * dt
+        # Appending the updated body to the list of updated bodies:
+        updated_bodies.append((body[0], body[1], x, y, vx, vy))
+    return updated_bodies
+
+
+# This function tracks the changes in the sum of each body's momentum and the sum of each body's kinetic energy:
+def calculate_momentum_and_energy(bodies):
+
+    # Initialising variables to store the total momentum and kinetic energy:
+    total_momentum = 0.0
+    total_kinetic_energy = 0.0
+    for body in bodies:
+        # Extracting the mass and velocity components from the body tuple:
+        mass, _, _, _, vx, vy = body
+        # Calculating the velocity magnitude:
+        velocity = np.sqrt(vx**2 + vy**2)
+        # Updating the total momentum with the product of mass and velocity:
+        total_momentum += mass * velocity
+        # Updating the total kinetic energy with the kinetic energy of the body:
+        total_kinetic_energy += 0.5 * mass * velocity**2
+
+    return total_momentum, total_kinetic_energy
+
+
+# Plotting the momenta and kinetic energies against the duration of the simulation and against the distance between bodies:
+def plot_results(momenta, kinetic_energies, radial_distances):
+    plt.figure(figsize=(7, 5.85))
+
+    # Plotting the total momentum
+    plt.subplot(4, 1, 1)
+    plt.plot(momenta, label='Total Momentum')
+    plt.xlabel('Time Step')
+    plt.ylabel('Momentum')
+    plt.title('Total Momentum over Time')
+    plt.legend()
+    plt.grid(True)
+
+    # Plotting the total kinetic energy
+    plt.subplot(4, 1, 2)
+    plt.plot(kinetic_energies, label='Total Kinetic Energy')
+    plt.xlabel('Time Step')
+    plt.ylabel('Kinetic Energy')
+    plt.title('Total Kinetic Energy over Time')
+    plt.legend()
+    plt.grid(True)
+
+    # Plotting energy and momentum against radial distance
+    plt.subplot(4, 1, 3)
+    plt.plot(radial_distances, momenta, label='Momentum vs Radial Distance')
+    plt.plot(radial_distances, kinetic_energies, label='Kinetic Energy vs Radial Distance')
+    plt.xlabel('Radial Distance')
+    plt.ylabel('Momentum / Kinetic Energy')
+    plt.title('Momentum and Kinetic Energy vs Radial Distance')
+    plt.legend()
+    plt.grid(True)
+
+    plt.tight_layout()
+    # Saving the figure
+    plt.savefig('Energy_and_momentum_plots.png')
+    plt.show()
+
+
+# This function illustrates the 3-body problem by relating the 3 bodies together and producing a visual output (graph) based on the parameters of each.
+# NOTE: this is a 2D plot. Besides, the initial conditions are not predetermined; instead, they're randomised. Furthermore, others ways in which planets and stars interact (e.g., tides, winds, magnetism etc) are fully discarded.
+def three_body_problem():
+
+    # Prompting the user to pick different bodies as part of the 3 body simulation:
+    # Case sensitive! 
+    choice_of_body1 = input ("Which celestial body would you like to utilise as the first object of this simulation? Please choose among 'Earth', 'Moon', 'Sun', 'Venus', 'Phobos', 'Deimos', 'Mercury', 'Jupiter', 'Saturn', 'Uranus', 'Neptune', 'Pluto', 'Mars', 'Titan', 'Sirius A', 'Sirius B' 'Polaris' and 'Proxima Centauri'. ")
+    choice_of_body2 = input ("Now, which celestial body would you like to utilise as the second object of this simulation? Please choose among 'Earth', 'Moon', 'Sun', 'Venus', 'Phobos', 'Deimos', 'Mercury', 'Jupiter', 'Saturn', 'Uranus', 'Neptune', 'Pluto', 'Mars', 'Titan', 'Sirius A', 'Sirius B' 'Polaris' and 'Proxima Centauri'. ")
+    choice_of_body3 = input ("And finally, which celestial body would you like to utilise as the third object of this simulation? Please choose among 'Earth', 'Moon', 'Sun', 'Venus', 'Phobos', 'Deimos', 'Mercury', 'Jupiter', 'Saturn', 'Uranus', 'Neptune', 'Pluto', 'Mars', 'Titan', 'Sirius A', 'Sirius B' 'Polaris' and 'Proxima Centauri'. ")
+
+    body1 = get_body_parameters (choice_of_body1)
+    body2 = get_body_parameters (choice_of_body2)
+    body3 = get_body_parameters (choice_of_body3)
+    print ('body1:', body1)
+    print ('body2:', body2)
+    print ('body3:', body3)
+
+    # Setting up turtle:
+    screen = turtle.Screen()
+    screen.setup(width=1250, height=9500)
+    screen.bgcolor("black")
+    screen.tracer(0)
+    turtle_obj = turtle.Turtle()
+    turtle_obj.hideturtle()
+    turtle_obj.speed(0)
+
+    # Initialising the time step, number of steps and lists to store momenta, kinetic energies and distances between objects:
+    dt = 0.2
+    num_steps = 800
+    momenta = []
+    kinetic_energies = []
+    radial_distances = []
+    
+    try:
+        for _ in range(num_steps):
+            # Calculating the distance (in m) between object 1 and object 2:
+            radial_distance_12 = np.sqrt( abs( (body1[2] - body2[2])**2 + (body1[3] - body2[3])**2 ) )
+            # Between object 2 and object 3:
+            radial_distance_23 = np.sqrt( abs( (body2[2] - body3[2])**2 + (body2[3] - body3[3])**2 ) )
+            # Between object 1 and object 3:
+            radial_distance_13 = np.sqrt( abs( (body1[2] - body3[2])**2 + (body1[3] - body3[3])**2 ) )
+
+            # Calculating the gravitational force between object 1 and object 2:
+            F_12 = (G * body1[0] * body2[0]) / ((radial_distance_12) * 1000) ** 2   # multiplied by 1000 to obtain the radius in meters
+            # Between object 2 and object 3:
+            F_23 = (G * body2[0] * body3[0]) / ((radial_distance_23) * 1000) ** 2
+            # Between object 1 and object 3:
+            F_13 = (G * body1[0] * body3[0]) / ((radial_distance_13) * 1000) ** 2
+
+            # Splitting the force into x and y components to find the x and y components of the acceleration of the masses:
+            # Calculating the gravitational force between object 1 and object 2 in the x and in the y directions:
+            if radial_distance_12 != 0:
+                Fx_12 = F_12 * (body2[2] - body1[2]) / radial_distance_12
+                Fy_12 = F_12 * (body2[3] - body1[3]) / radial_distance_12
+            else:
+                raise ZeroDivisionError ('Unfortunately, the radius between the first 2 bodies is too small for the components of the gravitational force between bodies 1 and 2 to be calculated.')
+
+            if radial_distance_23 != 0:
+                Fx_23 = F_23 * (body3[2] - body2[2]) / radial_distance_23
+                Fy_23 = F_23 * (body3[3] - body2[3]) / radial_distance_23
+            else:
+                raise ZeroDivisionError ('Unfortunately, the radius between the second and the third bodies is too small for the components of the gravitational force between bodies 2 and 3 to be calculated.')
+            
+            if radial_distance_13 != 0:
+                Fx_13 = F_13 * (body3[2] - body1[2]) / radial_distance_13
+                Fy_13 = F_13 * (body3[3] - body1[3]) / radial_distance_13
+            else:
+                raise ZeroDivisionError ('Unfortunately, the radius between the first and the third bodies is too small for the components of the gravitational force between objects between bodies 1 and 3 to be calculated.')
+            
+            # Updating the accelerations using Newton's second law (a = F/m):
+            if body1[0] != 0:
+                x_accel_1 = (Fx_12 - Fx_23) / body1[0]
+                y_accel_1 = (Fy_12 - Fy_23) / body1[0]
+            else:
+                raise ZeroDivisionError ('Unfortunately, the masss of the first body is too small to solve for the components of its gravitational acceleration.')
+        
+            if body2[0] != 0:
+                x_accel_2 = (Fx_12 - Fx_23) / body2[0]
+                y_accel_2 = (Fy_12 - Fy_23) / body2[0]
+            else:
+                raise ZeroDivisionError ('Unfortunately, the masss of the second body is too small to solve for the components of its gravitational acceleration.')
+        
+            if body3[0] != 0:
+                x_accel_3 = (Fx_13 - Fx_23) / body3[0]
+                y_accel_3 = (Fy_13 - Fy_23) / body3[0]
+            else:
+                raise ZeroDivisionError ('Unfortunately, the masss of the third body is too small to solve for the components of its gravitational acceleration.')
+
+            # Calling the update_body function:
+            body1 = update_body(body1, x_accel_1, y_accel_1, dt)
+            body2 = update_body(body2, x_accel_2, y_accel_2, dt)
+            body3 = update_body(body3, x_accel_3, y_accel_3, dt)
+
+            # Calling the calculate_momentum_and_energy function:
+            total_momentum, total_kinetic_energy = calculate_momentum_and_energy([body1, body2, body3])
+            
+            # Appending data to corresponding list:
+            momenta.append(total_momentum)
+            kinetic_energies.append(total_kinetic_energy)
+            radial_distances.append(radial_distance_12)  # Choose an appropriate radial distance for plotting
+  
+            # Clearing the screen and drawing the updated positions:
+            turtle_obj.clear()
+            draw_point(turtle_obj, body1[2], body1[3], body1[1], "blue")
+            draw_point(turtle_obj, body2[2], body2[3], body2[1], "green")
+            draw_point(turtle_obj, body3[2], body3[3], body3[1], "red")
+            turtle.update()
+
+            # Stopping the execution of the loop if bodies collide:
+            if (radial_distance_12 <= (body1[1] + body2[1])) or (radial_distance_23 <= (body2[1] + body3[1])) or (radial_distance_13 <= (body1[1] + body3[1])):
+                print ('Collision occurred !!!')
+                break
+
+        # Calling the plot_results function:
+        plot_results(momenta, kinetic_energies, radial_distances)
+    
+    # Handling potential errors occurring during the creation of the simulation:
+    except (tkinter.TclError, turtle.Terminator, Exception) as e:
+        print("Sorry, an error occurred: ", e)
+        turtle.bye()
+
+
+# This function directs the program towards the right function(s) to execute according to the input given by the user.
+def main (user_input):
+    
+    # OPTION 1
+    if user_input == "1":
+        gravitational_Force_Earth_human (Earth, human)
+        print (output_file_path)
+        
+    # OPTION 2:
+    elif user_input == "2":
+        Earth_Moon_syst (Earth, Moon)
+        print ('This is the orbit of the Moon around our planet!')
+
+    # OPTION 3:
+    elif user_input == "3":
+        three_body_problem ()
+        turtle.done()
+        print ("This system is a three-body problem, as 3 masses are interacting with one another through gravitational forces.")
+
+    else:
+        print ("\n Invalid number entered. Please run the program again, choosing a number from 1-3 depending on the desired simulation.")
+
+
+# Calling the main function:
+if __name__ == "__main__":
+    # Asking which simulation is the user interested in:
+    user_input = input("What is the preferred complexity level of the simulation tool you would like to launch? On a scale from 1 to 3, where 1 investigates the gravitational attraction between Earth and you; 2 presents the Earth-Moon system in 3 dimensions and 3 analyses a three-body problem in 2 dimensions. ")
+    main (user_input)
